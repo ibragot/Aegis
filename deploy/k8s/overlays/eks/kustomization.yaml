@@ -1,0 +1,54 @@
+# Amazon EKS. Fill in the values printed by `terraform output` (deploy/terraform), then:
+#   kubectl apply -k deploy/k8s/overlays/eks
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: aegis
+resources:
+  - ../../base
+  - ingress.yaml
+  - keda.yaml
+images:
+  - name: aegis
+    newName: 123456789012.dkr.ecr.us-east-1.amazonaws.com/aegis   # terraform output ecr_repository_url
+    newTag: "0.1.0"
+patches:
+  # KEDA ScaledObjects create their own HPAs - remove the CPU-based ones for the same Deployments.
+  - patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata: {name: auth-analyzer}
+  - patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata: {name: ml-inference}
+  - target: {kind: ServiceAccount, name: aegis}
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/aegis-workload   # terraform output irsa_role_arn
+  - target: {kind: ServiceAccount, name: aegis}
+    patch: |-
+      - op: replace
+        path: /automountServiceAccountToken
+        value: true
+  - target: {kind: ConfigMap, name: aegis-config}
+    patch: |-
+      - op: replace
+        path: /data/KAFKA_BOOTSTRAP_SERVERS
+        value: b-1.aegis.xxxxxx.c2.kafka.us-east-1.amazonaws.com:9094,b-2.aegis.xxxxxx.c2.kafka.us-east-1.amazonaws.com:9094  # terraform output msk_bootstrap_brokers_tls
+      - op: add
+        path: /data/KAFKA_SECURITY_PROTOCOL
+        value: SSL
+      - op: replace
+        path: /data/KAFKA_REPLICATION_FACTOR
+        value: "2"
+      - op: replace
+        path: /data/REDIS_URL
+        value: rediss://master.aegis.xxxxxx.use1.cache.amazonaws.com:6379/0  # terraform output redis_endpoint (TLS)
+      - op: replace
+        path: /data/AEGIS_ARCHIVE_BUCKET
+        value: aegis-raw-archive-123456789012  # terraform output archive_bucket
+      # DATABASE_URL (with the RDS password) comes from the aegis-secrets Secret, which overrides this value.

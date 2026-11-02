@@ -1,0 +1,130 @@
+# In-cluster Kafka, PostgreSQL and Redis for a local cluster (kind / minikube / Docker Desktop).
+# Single replicas with ephemeral storage - a lab setup. On EKS these are replaced by managed
+# services (Amazon MSK, RDS, ElastiCache) created by Terraform.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  labels: {app.kubernetes.io/name: kafka, app.kubernetes.io/component: infra}
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: kafka}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: kafka, app.kubernetes.io/component: infra}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: kafka
+          image: apache/kafka:3.9.1
+          env:
+            - {name: KAFKA_NODE_ID, value: "1"}
+            - {name: KAFKA_PROCESS_ROLES, value: "broker,controller"}
+            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093"}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092"}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"}
+            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093"}
+            - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: PLAINTEXT}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1"}
+            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1"}
+            - {name: KAFKA_NUM_PARTITIONS, value: "6"}
+            - {name: KAFKA_LOG_DIRS, value: /var/lib/kafka/data}
+          ports: [{containerPort: 9092, name: kafka}]
+          readinessProbe:
+            tcpSocket: {port: 9092}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 200m, memory: 768Mi}
+            limits: {memory: 1Gi}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: data, mountPath: /var/lib/kafka/data}]
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: kafka}
+spec:
+  selector: {app.kubernetes.io/name: kafka}
+  ports: [{name: kafka, port: 9092}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: {app.kubernetes.io/name: postgres, app.kubernetes.io/component: infra}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: postgres}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: postgres, app.kubernetes.io/component: infra}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 70, fsGroup: 70, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - {name: POSTGRES_USER, value: aegis}
+            - {name: POSTGRES_PASSWORD, value: aegis}
+            - {name: POSTGRES_DB, value: aegis}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports: [{containerPort: 5432, name: pg}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "aegis"]}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: run, mountPath: /var/run/postgresql}
+      volumes: [{name: data, emptyDir: {}}, {name: run, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgres}
+spec:
+  selector: {app.kubernetes.io/name: postgres}
+  ports: [{name: pg, port: 5432}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels: {app.kubernetes.io/name: redis, app.kubernetes.io/component: infra}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: redis}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: redis, app.kubernetes.io/component: infra}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 999, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports: [{containerPort: 6379, name: redis}]
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis}
+spec:
+  selector: {app.kubernetes.io/name: redis}
+  ports: [{name: redis, port: 6379}]
+---
+# Infra pods accept traffic from inside the namespace and may talk to each other.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: infra-in-namespace}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/component: infra}}
+  policyTypes: [Ingress, Egress]
+  ingress: [{from: [{podSelector: {}}]}]
+  egress: [{to: [{podSelector: {}}]}]

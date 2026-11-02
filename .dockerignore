@@ -1,0 +1,10 @@
+.git
+.venv
+venv
+data
+models
+**/__pycache__
+.pytest_cache
+.ruff_cache
+deploy/terraform/.terraform
+docs/images

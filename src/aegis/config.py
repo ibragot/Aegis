@@ -59,6 +59,7 @@ class Settings:
     # --- Paths ------------------------------------------------------------
     rules_dir: Path = field(default_factory=lambda: _resolve_dir("AEGIS_RULES_DIR", "config/rules"))
     knowledge_dir: Path = field(default_factory=lambda: _resolve_dir("AEGIS_KNOWLEDGE_DIR", "knowledge"))
+    report_dir: Path = field(default_factory=lambda: Path(_env("AEGIS_REPORT_DIR", str(REPO_ROOT / "ml" / "reports"))))
     model_dir: Path = field(default_factory=lambda: Path(_env("AEGIS_MODEL_DIR", str(REPO_ROOT / "models"))))
 
     # --- Detection --------------------------------------------------------

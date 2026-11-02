@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (git-ignored) and adjust.
+region      = "us-east-1"
+environment = "lab"
+
+# IMPORTANT: restrict the Kubernetes API to your own IP (curl -s https://checkip.amazonaws.com)
+admin_cidrs = ["203.0.113.10/32"]
+
+node_instance_types = ["t3.large"]
+node_desired_size   = 2
+
+enable_cloudtrail = false

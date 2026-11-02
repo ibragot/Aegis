@@ -1,0 +1,59 @@
+# Zero-trust networking inside the cluster: deny everything, then allow only the flows Aegis needs.
+# (Requires a CNI that enforces NetworkPolicy - e.g. the VPC CNI with network policies enabled on EKS,
+# Calico or Cilium. Without one these objects are silently ignored.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-all}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# DNS for everyone
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+---
+# Aegis pods may reach Kafka, PostgreSQL, Redis, the OTel collector and HTTPS (S3 / Anthropic API).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: aegis-egress}
+spec:
+  podSelector:
+    matchExpressions: [{key: app.kubernetes.io/component, operator: In, values: [worker, api]}]
+  policyTypes: [Egress]
+  egress:
+    - ports:
+        - {port: 9092, protocol: TCP}   # Kafka (plaintext, in-cluster)
+        - {port: 9094, protocol: TCP}   # Amazon MSK TLS
+        - {port: 9098, protocol: TCP}   # Amazon MSK IAM auth
+        - {port: 5432, protocol: TCP}   # PostgreSQL / RDS
+        - {port: 6379, protocol: TCP}   # Redis / ElastiCache
+        - {port: 4317, protocol: TCP}   # OTLP gRPC
+        - {port: 443, protocol: TCP}    # S3, Anthropic API, AWS APIs
+---
+# Only the ingress controller may reach the API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: api-ingress}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: api}}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8000, protocol: TCP}]
+---
+# Prometheus (namespace "monitoring") may scrape metrics ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-prometheus-scrape}
+spec:
+  podSelector:
+    matchExpressions: [{key: app.kubernetes.io/component, operator: In, values: [worker, api]}]
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]
+      ports: [{port: 9100, protocol: TCP}, {port: 8000, protocol: TCP}]
