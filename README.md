@@ -937,8 +937,8 @@ but not yet applied to a running cluster. See Section 13.)
 | `outputs.tf` | values to paste into the EKS overlay | |
 
 Community modules (`terraform-aws-modules/vpc`, `/eks`, `/iam`) are used for VPC/EKS/IRSA, the way
-most companies do it. `terraform fmt` passes; `terraform validate` runs in CI (it needs the
-Terraform registry, which the build sandbox could not reach). **It has not been applied to a real
+most companies do it. `terraform fmt` passes; `terraform init` + `terraform validate` pass in
+GitHub Actions (they need the Terraform registry, which the build sandbox could not reach). **It has not been applied to a real
 AWS account**: that needs your credentials and costs money, see Section 11.
 
 ### Step 17: Testing and CI
@@ -1256,11 +1256,12 @@ Honest status of what has and hasn't been verified:
 
 | Part | Status |
 |---|---|
-| In-process pipeline, rules, ML, graph, correlation, template investigator, API, dashboard | tested (35 tests) and run end-to-end |
+| In-process pipeline, rules, ML, graph, correlation, template investigator, API, dashboard | tested (35 tests, green in GitHub Actions) and run end-to-end |
+| Docker image | builds in CI (models trained during the build) and passes its smoke test |
 | docker compose stack (Kafka, Postgres, Redis, LocalStack S3, Prometheus, Grafana, OTel, Jaeger) | **run end-to-end**, screenshots in `docs/images` |
 | Claude investigator | request shape verified with the real SDK against a mocked HTTP endpoint; **not yet run against the live API** (needs your `ANTHROPIC_API_KEY`) |
-| Kubernetes manifests | rendered with kustomize, schema-checked in CI; **not yet applied to a live cluster** |
-| Terraform | formatted; validated in CI; **not applied to AWS** (needs your account; costs money) |
+| Kubernetes manifests | rendered with kustomize, kubeconform schema validation passes in CI; **not yet applied to a live cluster** |
+| Terraform | `fmt`, `init` and `validate` pass in CI; **not applied to AWS** (needs your account; costs money) |
 
 Known simplifications (all fine for a lab, each a good next project):
 
