@@ -1,0 +1,133 @@
+# Authentication detections - consumed by the auth-analyzer service (topic events.auth).
+# Each rule maps to a MITRE ATT&CK technique so incidents can be described as a
+# progression through attacker tactics.
+
+- id: AEG-AUTH-001
+  name: Brute force against a single account
+  description: >
+    Five or more failed authentications for the same identity within five minutes.
+    Typical of password guessing against one known account.
+  severity: medium
+  analyzer: auth
+  type: threshold
+  mitre: {tactic: Credential Access, technique_id: T1110.001, technique: "Brute Force: Password Guessing"}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: outcome, eq: failure}
+  threshold: {count: 5, window: 300, group_by: [principal]}
+  entities: [principal, src_ip]
+  tests:
+    - {expect: alert, scenario: credential_compromise}
+
+- id: AEG-AUTH-002
+  name: Password spray from a single source
+  description: >
+    One source IP failed to authenticate as eight or more distinct identities within ten minutes.
+    Password spraying tries a few common passwords against many accounts to stay under lockout limits.
+  severity: high
+  analyzer: auth
+  type: threshold
+  mitre: {tactic: Credential Access, technique_id: T1110.003, technique: "Brute Force: Password Spraying"}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: outcome, eq: failure}
+  threshold: {count: 8, window: 600, group_by: [src_ip], distinct: principal}
+  entities: [src_ip]
+  tests:
+    - {expect: alert, scenario: password_spray}
+
+- id: AEG-AUTH-003
+  name: Successful login after repeated failures
+  description: >
+    Three or more failures followed by a success for the same identity within ten minutes.
+    The guessing worked - the account should be treated as compromised until proven otherwise.
+  severity: high
+  analyzer: auth
+  type: sequence
+  mitre: {tactic: Credential Access, technique_id: T1110, technique: Brute Force}
+  sequence:
+    window: 600
+    group_by: [principal]
+    steps:
+      - name: repeated failures
+        min_count: 3
+        match:
+          all:
+            - {field: category, eq: authentication}
+            - {field: outcome, eq: failure}
+      - name: success
+        match:
+          all:
+            - {field: source, eq: auth}
+            - {field: outcome, eq: success}
+  entities: [principal, src_ip]
+
+- id: AEG-AUTH-004
+  name: Login from a country never seen for this identity
+  description: >
+    First successful authentication from this country for the identity. Can be travel, a VPN
+    change - or a stolen credential used from attacker infrastructure.
+  severity: medium
+  analyzer: auth
+  type: new_value
+  mitre: {tactic: Initial Access, technique_id: T1078, technique: Valid Accounts}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: outcome, eq: success}
+      - {field: geo_country, exists: true}
+  new_value: {field: geo_country, group_by: [principal], min_known: 1}
+  entities: [principal, src_ip, geo_country]
+
+- id: AEG-AUTH-005
+  name: Privileged session established without MFA
+  description: >
+    A privileged session (admin SSO app or an Admin role) was established without multi-factor
+    authentication. Zero-trust policy requires MFA for every privileged session.
+  severity: high
+  analyzer: auth
+  type: match
+  mitre: {tactic: Privilege Escalation, technique_id: T1078.004, technique: "Valid Accounts: Cloud Accounts"}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: outcome, eq: success}
+      - {field: privileged, eq: true}
+      - {field: mfa, eq: false}
+  entities: [principal, src_ip, attributes.role]
+
+- id: AEG-AUTH-006
+  name: Service account authenticated from outside the network
+  description: >
+    Service accounts are machine identities that only ever run inside the VPC. Authentication
+    from an external address strongly suggests a leaked client secret or access key.
+  severity: high
+  analyzer: auth
+  type: match
+  cooldown: 900
+  mitre: {tactic: Initial Access, technique_id: T1078.004, technique: "Valid Accounts: Cloud Accounts"}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: principal_type, eq: service_account}
+      - {field: outcome, eq: success}
+      - not: {field: src_ip, cidr: 10.0.0.0/8}
+  entities: [principal, src_ip, geo_country]
+
+- id: AEG-AUTH-007
+  name: Authentication from a hosting-provider IP
+  description: >
+    Interactive logins normally come from residential ISPs or the corporate VPN. Logins from
+    VPS / hosting ranges are a common sign of attacker infrastructure.
+  severity: low
+  analyzer: auth
+  type: match
+  cooldown: 900
+  mitre: {tactic: Initial Access, technique_id: T1078, technique: Valid Accounts}
+  match:
+    all:
+      - {field: category, eq: authentication}
+      - {field: attributes.src_hosting, eq: true}
+  entities: [principal, src_ip]

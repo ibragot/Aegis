@@ -1,0 +1,175 @@
+# Cloud control-plane detections (CloudTrail + Kubernetes audit) - consumed by cloud-analyzer.
+
+- id: AEG-IAM-001
+  name: Administrator policy attached
+  description: >
+    AdministratorAccess (or an inline "*:*" policy) was attached to a user or role. Granting
+    full admin is the fastest privilege-escalation path in AWS.
+  severity: high
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Privilege Escalation, technique_id: T1098.003, technique: "Account Manipulation: Additional Cloud Roles"}
+  match:
+    all:
+      - {field: action, in: [AttachUserPolicy, AttachRolePolicy, AttachGroupPolicy, PutUserPolicy, PutRolePolicy]}
+      - {field: outcome, eq: success}
+      - any:
+          - {field: attributes.policy_arn, contains: AdministratorAccess}
+          - {field: attributes.request.policyDocument, contains: '"Action":"*"'}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-IAM-002
+  name: New IAM user or access key created
+  description: >
+    Creating IAM users or long-lived access keys outside of the infrastructure-as-code pipeline
+    is a classic persistence technique - the attacker keeps access after the original credential
+    is rotated.
+  severity: medium
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Persistence, technique_id: T1136.003, technique: "Create Account: Cloud Account"}
+  match:
+    all:
+      - {field: action, in: [CreateUser, CreateAccessKey, CreateLoginProfile]}
+      - {field: outcome, eq: success}
+  entities: [principal, src_ip, target_resource, attributes.created_access_key]
+
+- id: AEG-DEF-001
+  name: Security logging disabled or deleted
+  description: >
+    CloudTrail, VPC flow logs or GuardDuty were stopped or deleted. Attackers blind defenders
+    before doing anything noisy; legitimate changes go through change management.
+  severity: critical
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Defense Evasion, technique_id: T1562.008, technique: "Impair Defenses: Disable or Modify Cloud Logs"}
+  match:
+    all:
+      - {field: action, in: [StopLogging, DeleteTrail, UpdateTrail, PutEventSelectors, DeleteFlowLogs, DeleteDetector,
+                             DisableSecurityHub]}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-RES-001
+  name: GPU / high-cost compute launched
+  description: >
+    A GPU or very large instance type was launched. Commonly used for crypto-mining
+    (resource hijacking) after a credential compromise.
+  severity: high
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Impact, technique_id: T1496, technique: Resource Hijacking}
+  match:
+    all:
+      - {field: action, eq: RunInstances}
+      - {field: attributes.instance_type, regex: '^(p\d|g\d|x\d|inf|trn|dl)'}
+  entities: [principal, src_ip, attributes.instance_id, attributes.private_ip, target_resource]
+
+- id: AEG-SEC-001
+  name: Burst of secret retrievals
+  description: >
+    Five or more secrets read by one identity within five minutes. Applications read the same
+    one or two secrets; reading many different ones is credential harvesting.
+  severity: high
+  analyzer: cloud
+  type: threshold
+  mitre: {tactic: Credential Access, technique_id: T1555.006, technique: "Credentials from Password Stores: Cloud Secrets Management Stores"}
+  match:
+    all:
+      - {field: action, in: [GetSecretValue, BatchGetSecretValue]}
+  threshold: {count: 5, window: 300, group_by: [principal], distinct: target_resource}
+  entities: [principal, src_ip]
+
+- id: AEG-S3-001
+  name: Bulk download from a sensitive bucket
+  description: >
+    Fifty or more objects downloaded from a bucket that holds customer data within ten minutes.
+  severity: high
+  analyzer: cloud
+  type: threshold
+  mitre: {tactic: Collection, technique_id: T1530, technique: Data from Cloud Storage}
+  match:
+    all:
+      - {field: action, eq: GetObject}
+      - {field: target_resource, in: [aegis-customer-data]}
+  threshold: {count: 50, window: 600, group_by: [principal]}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-K8S-001
+  name: Privileged or host-mounted pod created
+  description: >
+    A pod was created with privileged containers, hostPath volumes or host namespaces. These
+    break container isolation and allow escape to the node.
+  severity: high
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Privilege Escalation, technique_id: T1611, technique: Escape to Host}
+  match:
+    all:
+      - {field: source, eq: k8s_audit}
+      - {field: action, eq: create pods}
+      - {field: outcome, eq: success}
+      - any:
+          - {field: attributes.privileged_pod, eq: true}
+          - {field: attributes.host_path, eq: true}
+          - {field: attributes.host_namespaces, eq: true}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-K8S-002
+  name: Interactive exec into a container
+  description: >
+    Someone opened a shell inside a running container (kubectl exec). Sometimes legitimate
+    debugging - very often the hands-on-keyboard phase of an attack.
+  severity: low
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Execution, technique_id: T1609, technique: Container Administration Command}
+  match:
+    all:
+      - {field: action, eq: create pods/exec}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-K8S-003
+  name: Binding to cluster-admin created
+  description: >
+    A ClusterRoleBinding granting cluster-admin was created. This gives full control over
+    the cluster and is a common persistence step after a container compromise.
+  severity: critical
+  analyzer: cloud
+  type: match
+  mitre: {tactic: Persistence, technique_id: T1098, technique: Account Manipulation}
+  match:
+    all:
+      - {field: attributes.resource, in: [clusterrolebindings, rolebindings]}
+      - {field: attributes.role_ref, eq: cluster-admin}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-K8S-004
+  name: Repeated forbidden access to secrets
+  description: >
+    Three or more denied (403) requests for Kubernetes secrets within five minutes - a workload
+    probing what its service account can read.
+  severity: medium
+  analyzer: cloud
+  type: threshold
+  mitre: {tactic: Discovery, technique_id: T1613, technique: Container and Resource Discovery}
+  match:
+    all:
+      - {field: attributes.resource, eq: secrets}
+      - {field: outcome, eq: failure}
+  threshold: {count: 3, window: 300, group_by: [principal]}
+  entities: [principal, src_ip]
+
+- id: AEG-DISC-001
+  name: IAM enumeration with access denied
+  description: >
+    Several IAM read calls failed with AccessDenied in a short time - an attacker mapping what
+    a stolen credential can do.
+  severity: medium
+  analyzer: cloud
+  type: threshold
+  mitre: {tactic: Discovery, technique_id: T1087.004, technique: "Account Discovery: Cloud Account"}
+  match:
+    all:
+      - {field: attributes.error_code, eq: AccessDenied}
+  threshold: {count: 3, window: 300, group_by: [principal]}
+  entities: [principal, src_ip]

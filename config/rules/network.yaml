@@ -1,0 +1,80 @@
+# Network (VPC flow logs) and application-layer detections - consumed by network-analyzer.
+
+- id: AEG-NET-001
+  name: Port scan from internal host
+  description: >
+    One source contacted 20+ distinct destination ports within two minutes. Internal hosts
+    talk to a handful of well-known ports; scanning is reconnaissance before lateral movement.
+  severity: medium
+  analyzer: network
+  type: threshold
+  mitre: {tactic: Discovery, technique_id: T1046, technique: Network Service Discovery}
+  match:
+    all:
+      - {field: category, eq: network}
+  threshold: {count: 20, window: 120, group_by: [src_ip], distinct: dst_port}
+  entities: [src_ip]
+
+- id: AEG-NET-002
+  name: Large outbound transfer to an external address
+  description: >
+    A single flow sent more than 50 MB from inside the VPC to an external hosting-provider
+    address. Possible data exfiltration over an encrypted channel.
+  severity: high
+  analyzer: network
+  type: match
+  mitre: {tactic: Exfiltration, technique_id: T1048, technique: Exfiltration Over Alternative Protocol}
+  match:
+    all:
+      - {field: category, eq: network}
+      - {field: attributes.src_internal, eq: true}
+      - {field: attributes.dst_internal, eq: false}
+      - {field: bytes_out, gte: 50000000}
+      - {field: attributes.dst_hosting, eq: true}
+  entities: [src_ip, dst_ip]
+
+- id: AEG-NET-003
+  name: SSH connection burst between internal hosts
+  description: >
+    Fifteen or more SSH (22/tcp) connections from one internal host within two minutes. Servers
+    in this environment are managed via SSM, so SSH fan-out suggests lateral movement.
+  severity: medium
+  analyzer: network
+  type: threshold
+  mitre: {tactic: Lateral Movement, technique_id: T1021.004, technique: "Remote Services: SSH"}
+  match:
+    all:
+      - {field: category, eq: network}
+      - {field: dst_port, eq: 22}
+  threshold: {count: 15, window: 120, group_by: [src_ip]}
+  entities: [src_ip]
+
+- id: AEG-APP-001
+  name: Bulk data export through admin API
+  description: >
+    Twenty or more requests to /admin/export endpoints within two minutes from one client.
+    Admin exports are rare manual operations; automated bulk export is data theft.
+  severity: high
+  analyzer: network
+  type: threshold
+  mitre: {tactic: Collection, technique_id: T1213, technique: Data from Information Repositories}
+  match:
+    all:
+      - {field: category, eq: application}
+      - {field: attributes.path, startswith: /admin/export}
+  threshold: {count: 20, window: 120, group_by: [src_ip]}
+  entities: [principal, src_ip, target_resource]
+
+- id: AEG-APP-002
+  name: Burst of unauthorized API responses
+  description: Fifteen or more 401/403 responses to one client within two minutes.
+  severity: low
+  analyzer: network
+  type: threshold
+  mitre: {tactic: Reconnaissance, technique_id: T1595, technique: Active Scanning}
+  match:
+    all:
+      - {field: category, eq: application}
+      - {field: attributes.status, in: [401, 403]}
+  threshold: {count: 15, window: 120, group_by: [src_ip]}
+  entities: [src_ip, target_resource]
