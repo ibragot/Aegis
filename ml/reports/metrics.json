@@ -1,0 +1,269 @@
+{
+  "generated_at": "2026-11-02T23:15:51.522753+00:00",
+  "seed": 7,
+  "data": {
+    "train_events": 50426,
+    "train_malicious": 567,
+    "validation_events": 10800,
+    "validation_malicious": 328,
+    "test_events": 14300,
+    "test_malicious": 458,
+    "features": 32
+  },
+  "thresholds": {
+    "isolation_forest": 0.6030800349383643,
+    "autoencoder": 2.3136911392211914,
+    "xgboost": 0.762656033039093,
+    "markov_sequence": 3.871201010907891
+  },
+  "target_fpr_unsupervised": 0.005,
+  "results": {
+    "isolation_forest": {
+      "precision": 0.7863,
+      "recall": 0.6266,
+      "f1": 0.6974,
+      "false_positive_rate": 0.00564,
+      "tp": 287,
+      "fp": 78,
+      "fn": 171,
+      "tn": 13764,
+      "roc_auc": 0.9932,
+      "pr_auc": 0.8377,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "1/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "autoencoder": {
+      "precision": 0.8852,
+      "recall": 0.7576,
+      "f1": 0.8165,
+      "false_positive_rate": 0.00325,
+      "tp": 347,
+      "fp": 45,
+      "fn": 111,
+      "tn": 13797,
+      "roc_auc": 0.997,
+      "pr_auc": 0.9262,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "2/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "xgboost": {
+      "precision": 0.9956,
+      "recall": 0.9956,
+      "f1": 0.9956,
+      "false_positive_rate": 0.00014,
+      "tp": 456,
+      "fp": 2,
+      "fn": 2,
+      "tn": 13840,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "2/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "markov_sequence": {
+      "precision": 0.7662,
+      "recall": 0.4651,
+      "f1": 0.5788,
+      "false_positive_rate": 0.0047,
+      "tp": 213,
+      "fp": 65,
+      "fn": 245,
+      "tn": 13777,
+      "roc_auc": 0.8475,
+      "pr_auc": 0.4353,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "0/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "ensemble": {
+      "precision": 0.9421,
+      "recall": 0.9956,
+      "f1": 0.9682,
+      "false_positive_rate": 0.00202,
+      "tp": 456,
+      "fp": 28,
+      "fn": 2,
+      "tn": 13814,
+      "roc_auc": 0.9989,
+      "pr_auc": 0.9887,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "2/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "rules_engine": {
+      "precision": 0.9848,
+      "recall": 0.7074,
+      "f1": 0.8234,
+      "false_positive_rate": 0.00036,
+      "tp": 324,
+      "fp": 5,
+      "fn": 134,
+      "tn": 13837,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "2/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    },
+    "rules_plus_ml": {
+      "precision": 0.9366,
+      "recall": 1.0,
+      "f1": 0.9673,
+      "false_positive_rate": 0.00224,
+      "tp": 458,
+      "fp": 31,
+      "fn": 0,
+      "tn": 13811,
+      "scenario_detection": {
+        "credential_compromise": "1/1",
+        "data_exfiltration": "2/2",
+        "defense_evasion": "2/2",
+        "internal_recon": "2/2",
+        "k8s_compromise": "1/1",
+        "password_spray": "2/2"
+      }
+    }
+  },
+  "latency_ms": {
+    "feature_extraction": {
+      "per_event": 0.0274
+    },
+    "isolation_forest": {
+      "batched_per_event": 0.0184,
+      "single_event": 8.748,
+      "single_event_p99": 12.791
+    },
+    "autoencoder": {
+      "batched_per_event": 0.0006,
+      "single_event": 0.184,
+      "single_event_p99": 0.315
+    },
+    "xgboost": {
+      "batched_per_event": 0.0019,
+      "single_event": 0.16,
+      "single_event_p99": 0.43
+    },
+    "markov_sequence": {
+      "batched_per_event": 0.0013,
+      "single_event": 0.0013
+    }
+  },
+  "novel_attack_recall": {
+    "credential_compromise": {
+      "xgboost_seen": 0.991,
+      "xgboost_unseen": 0.948,
+      "autoencoder": 0.948,
+      "isolation_forest": 0.914,
+      "ensemble": 0.991
+    },
+    "data_exfiltration": {
+      "xgboost_seen": 1.0,
+      "xgboost_unseen": 0.0,
+      "autoencoder": 0.496,
+      "isolation_forest": 0.216,
+      "ensemble": 1.0
+    },
+    "defense_evasion": {
+      "xgboost_seen": 1.0,
+      "xgboost_unseen": 1.0,
+      "autoencoder": 1.0,
+      "isolation_forest": 1.0,
+      "ensemble": 1.0
+    },
+    "internal_recon": {
+      "xgboost_seen": 0.992,
+      "xgboost_unseen": 0.0,
+      "autoencoder": 1.0,
+      "isolation_forest": 0.967,
+      "ensemble": 0.992
+    },
+    "k8s_compromise": {
+      "xgboost_seen": 1.0,
+      "xgboost_unseen": 0.0,
+      "autoencoder": 1.0,
+      "isolation_forest": 1.0,
+      "ensemble": 1.0
+    },
+    "password_spray": {
+      "xgboost_seen": 1.0,
+      "xgboost_unseen": 0.947,
+      "autoencoder": 0.386,
+      "isolation_forest": 0.158,
+      "ensemble": 1.0
+    }
+  },
+  "xgboost_top_features": [
+    [
+      "rate_5m",
+      0.4638
+    ],
+    [
+      "src_hosting",
+      0.2023
+    ],
+    [
+      "is_failure",
+      0.0755
+    ],
+    [
+      "rate_ratio",
+      0.0572
+    ],
+    [
+      "failures_10m",
+      0.0506
+    ],
+    [
+      "cat_application",
+      0.0503
+    ],
+    [
+      "log_bytes_out",
+      0.0374
+    ],
+    [
+      "distinct_resources_10m",
+      0.011
+    ],
+    [
+      "transition_rarity",
+      0.0097
+    ],
+    [
+      "cat_resource",
+      0.0074
+    ]
+  ],
+  "training_seconds": 13.9
+}
