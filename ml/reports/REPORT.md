@@ -1,6 +1,6 @@
 # Aegis ML evaluation report
 
-Generated 2026-11-02T23:15:51.522753+00:00 by `aegis train` (seed 7). All numbers are on the held-out **test** split (different days and random seed than training).
+Generated 2026-11-02T23:25:45.373330+00:00 by `aegis train` (seed 7). All numbers are on the held-out **test** split (different days and random seed than training).
 
 ## Data
 
@@ -21,8 +21,8 @@ Features per event: 32. Unsupervised thresholds target a 0.5% false-positive rat
 | xgboost | 0.996 | 0.996 | 0.996 | 0.0001 | 1.0 | 1.0 | 456 | 2 | 2 |
 | markov_sequence | 0.766 | 0.465 | 0.579 | 0.0047 | 0.8475 | 0.4353 | 213 | 65 | 245 |
 | ensemble | 0.942 | 0.996 | 0.968 | 0.0020 | 0.9989 | 0.9887 | 456 | 28 | 2 |
-| rules_engine | 0.985 | 0.707 | 0.823 | 0.0004 | - | - | 324 | 5 | 134 |
-| rules_plus_ml | 0.937 | 1.000 | 0.967 | 0.0022 | - | - | 458 | 31 | 0 |
+| rules_engine | 0.997 | 0.681 | 0.809 | 0.0001 | - | - | 312 | 1 | 146 |
+| rules_plus_ml | 0.941 | 1.000 | 0.969 | 0.0021 | - | - | 458 | 29 | 0 |
 
 ## Attack-instance detection (caught at least one event of the attack)
 
@@ -40,10 +40,10 @@ Features per event: 32. Unsupervised thresholds target a 0.5% false-positive rat
 
 | stage / model | batched (500-1000 events) | single event (median) |
 |---|---:|---:|
-| feature_extraction | 0.0274 | - |
-| isolation_forest | 0.0184 | 8.748 |
-| autoencoder | 0.0006 | 0.184 |
-| xgboost | 0.0019 | 0.16 |
+| feature_extraction | 0.0306 | - |
+| isolation_forest | 0.0169 | 7.738 |
+| autoencoder | 0.0006 | 0.178 |
+| xgboost | 0.0016 | 0.158 |
 | markov_sequence | 0.0013 | 0.0013 |
 
 ## Novel-attack test (event recall per scenario)

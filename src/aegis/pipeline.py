@@ -34,6 +34,7 @@ class LocalPipeline:
                  use_llm: bool = False, ml_engine=None):
         self.settings = settings or get_settings()
         self.repo = repo or Repository(self.settings.database_url)
+        self.use_llm = use_llm
         self.bus = MemoryBus()
         self.lock = threading.RLock()
         from aegis.investigator import Investigator

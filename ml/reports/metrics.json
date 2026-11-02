@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T23:15:51.522753+00:00",
+  "generated_at": "2026-11-02T23:25:45.373330+00:00",
   "seed": 7,
   "data": {
     "train_events": 50426,
@@ -119,14 +119,14 @@
       }
     },
     "rules_engine": {
-      "precision": 0.9848,
-      "recall": 0.7074,
-      "f1": 0.8234,
-      "false_positive_rate": 0.00036,
-      "tp": 324,
-      "fp": 5,
-      "fn": 134,
-      "tn": 13837,
+      "precision": 0.9968,
+      "recall": 0.6812,
+      "f1": 0.8093,
+      "false_positive_rate": 7e-05,
+      "tp": 312,
+      "fp": 1,
+      "fn": 146,
+      "tn": 13841,
       "scenario_detection": {
         "credential_compromise": "1/1",
         "data_exfiltration": "2/2",
@@ -137,14 +137,14 @@
       }
     },
     "rules_plus_ml": {
-      "precision": 0.9366,
+      "precision": 0.9405,
       "recall": 1.0,
-      "f1": 0.9673,
-      "false_positive_rate": 0.00224,
+      "f1": 0.9693,
+      "false_positive_rate": 0.0021,
       "tp": 458,
-      "fp": 31,
+      "fp": 29,
       "fn": 0,
-      "tn": 13811,
+      "tn": 13813,
       "scenario_detection": {
         "credential_compromise": "1/1",
         "data_exfiltration": "2/2",
@@ -157,22 +157,22 @@
   },
   "latency_ms": {
     "feature_extraction": {
-      "per_event": 0.0274
+      "per_event": 0.0306
     },
     "isolation_forest": {
-      "batched_per_event": 0.0184,
-      "single_event": 8.748,
-      "single_event_p99": 12.791
+      "batched_per_event": 0.0169,
+      "single_event": 7.738,
+      "single_event_p99": 9.203
     },
     "autoencoder": {
       "batched_per_event": 0.0006,
-      "single_event": 0.184,
-      "single_event_p99": 0.315
+      "single_event": 0.178,
+      "single_event_p99": 0.239
     },
     "xgboost": {
-      "batched_per_event": 0.0019,
-      "single_event": 0.16,
-      "single_event_p99": 0.43
+      "batched_per_event": 0.0016,
+      "single_event": 0.158,
+      "single_event_p99": 0.262
     },
     "markov_sequence": {
       "batched_per_event": 0.0013,
@@ -265,5 +265,5 @@
       0.0074
     ]
   ],
-  "training_seconds": 13.9
+  "training_seconds": 12.5
 }

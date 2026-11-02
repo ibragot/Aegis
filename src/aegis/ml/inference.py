@@ -91,6 +91,8 @@ class MLEngine:
                     event_ids=[evt.event_id],
                     evidence={
                         "action": evt.action,
+                        "outcome": evt.outcome,
+                        "category": evt.category,
                         "model": self.model,
                         "normalized_score": round(s, 3),
                         "model_scores": {k: round(float(v[i]), 3) for k, v in norm.items()},

@@ -28,7 +28,17 @@ def _title(incident: Incident, alerts: list[Alert]) -> str:
     tactics = incident.tactics
     if len(tactics) > 3:
         tactics = [tactics[0], tactics[len(tactics) // 2], tactics[-1]]
-    who = next((e.value for e in incident.entities if e.type in ("user", "service_account")), None)
+    # Name the incident after the identity that *acted* most often (successful actions only -
+    # the targets of failed logins are victims, not actors), else after the source IP.
+    from collections import Counter
+
+    actors: Counter = Counter()
+    for a in alerts:
+        if a.evidence.get("outcome") != "failure":
+            for e in a.entities:
+                if e.type in ("user", "service_account"):
+                    actors[e.value] += 1
+    who = actors.most_common(1)[0][0] if actors else None
     who = who or next((e.value for e in incident.entities if e.type in ("ip", "host")), "unknown entity")
     if not tactics:
         top = max(alerts, key=lambda a: a.score)
@@ -41,13 +51,25 @@ class Correlator:
         self.repo = repo
         self.window = timedelta(minutes=window_minutes)
 
+    @staticmethod
+    def correlation_keys(alert: Alert) -> list[str]:
+        """Strong entities usable for merging.
+
+        On a *failed* authentication the principal is the attack's target, not
+        its actor: a password spray "touches" every user it tries, and those
+        users must not glue unrelated incidents together.
+        """
+        failed = alert.evidence.get("outcome") == "failure" and alert.evidence.get("category") == "authentication"
+        return [e.id for e in alert.entities
+                if is_strong(e) and not (failed and e.type in ("user", "service_account"))]
+
     def process(self, alert: Alert) -> Incident:
-        strong = [e.id for e in alert.entities if is_strong(e)]
+        strong = self.correlation_keys(alert)
         linked = expand_strong(self.repo, strong, hops=1) if strong else set()
         since = alert.event_time - self.window
         candidates = [
             inc for inc in self.repo.open_incidents_since(since)
-            if {e.id for e in inc.entities if is_strong(e)} & (linked or set(strong))
+            if set(inc.correlation_keys) & (linked or set(strong))
         ]
         candidates.sort(key=lambda i: i.incident_id)
 
@@ -62,6 +84,7 @@ class Correlator:
                 log.info("merging incident %s into %s", other.incident_id, inc.incident_id)
                 inc.alert_ids += [a for a in other.alert_ids if a not in inc.alert_ids]
                 inc.entities = _union(inc.entities, other.entities)
+                inc.correlation_keys = sorted(set(inc.correlation_keys) | set(other.correlation_keys))
                 inc.first_seen = min(inc.first_seen, other.first_seen)
                 inc.last_seen = max(inc.last_seen, other.last_seen)
             if others:
@@ -71,6 +94,7 @@ class Correlator:
         if alert.alert_id not in inc.alert_ids:
             inc.alert_ids.append(alert.alert_id)
         inc.entities = _union(inc.entities, alert.entities)
+        inc.correlation_keys = sorted(set(inc.correlation_keys) | set(strong))
         inc.first_seen = min(inc.first_seen, alert.event_time)
         inc.last_seen = max(inc.last_seen, alert.event_time)
 
@@ -104,7 +128,7 @@ class Correlator:
             return []
         horizon = max(i.last_seen for i in open_incs) - 6 * self.window
         incs = sorted((i for i in open_incs if i.last_seen >= horizon), key=lambda i: i.incident_id)
-        strong = {i.incident_id: {e.id for e in i.entities if is_strong(e)} for i in incs}
+        strong = {i.incident_id: set(i.correlation_keys) for i in incs}
         expanded = {i.incident_id: expand_strong(self.repo, sorted(strong[i.incident_id])) for i in incs}
         parent = {i.incident_id: i.incident_id for i in incs}
 
@@ -132,6 +156,7 @@ class Correlator:
             for o in others:
                 target.alert_ids += [a for a in o.alert_ids if a not in target.alert_ids]
                 target.entities = _union(target.entities, o.entities)
+                target.correlation_keys = sorted(set(target.correlation_keys) | set(o.correlation_keys))
                 target.first_seen = min(target.first_seen, o.first_seen)
                 target.last_seen = max(target.last_seen, o.last_seen)
             log.info("reconcile: merged %s into %s", [o.incident_id for o in others], target.incident_id)

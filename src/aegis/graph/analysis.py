@@ -40,9 +40,16 @@ def incident_subgraph(repo: Repository, incident: Incident, max_edges: int = 400
     # but always keep strong (causal) edges.
     lo = incident.first_seen.timestamp() - 3600
     hi = incident.last_seen.timestamp() + 3600
+    # Busy shared nodes (production-api, a country) touch hundreds of unrelated identities.
+    # For those "weak" incident entities only keep edges that lead to another incident entity.
+    weak = {i for i in core if i.split(":", 1)[0] in ("resource", "country", "role")}
+    core_set = set(core)
     g = nx.MultiDiGraph()
     for e in edges:
         recent = e["last_seen"] and lo <= e["last_seen"].timestamp() and e["first_seen"].timestamp() <= hi
+        touches_strong = (e["src"] in core_set and e["src"] not in weak) or (e["dst"] in core_set and e["dst"] not in weak)
+        if not touches_strong and not (e["src"] in core_set and e["dst"] in core_set):
+            continue
         if recent or e["type"] in STRONG_EDGES:
             g.add_edge(e["src"], e["dst"], type=e["type"], count=e["count"])
     for node_id in core:

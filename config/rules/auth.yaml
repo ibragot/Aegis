@@ -41,8 +41,9 @@
 - id: AEG-AUTH-003
   name: Successful login after repeated failures
   description: >
-    Three or more failures followed by a success for the same identity within ten minutes.
+    Four or more failures followed by a success for the same identity within ten minutes.
     The guessing worked - the account should be treated as compromised until proven otherwise.
+    (Tuned from 3 to 4: users who mistype their password three times were the main false positive.)
   severity: high
   analyzer: auth
   type: sequence
@@ -52,7 +53,7 @@
     group_by: [principal]
     steps:
       - name: repeated failures
-        min_count: 3
+        min_count: 4
         match:
           all:
             - {field: category, eq: authentication}
@@ -117,10 +118,11 @@
   entities: [principal, src_ip, geo_country]
 
 - id: AEG-AUTH-007
-  name: Authentication from a hosting-provider IP
+  name: Successful authentication from a hosting-provider IP
   description: >
-    Interactive logins normally come from residential ISPs or the corporate VPN. Logins from
-    VPS / hosting ranges are a common sign of attacker infrastructure.
+    Logins normally come from residential ISPs, the corporate VPN or the VPC. A successful login
+    from a VPS / hosting range is a common sign of attacker infrastructure. (Failures from such
+    ranges are covered by the brute-force and spraying rules.)
   severity: low
   analyzer: auth
   type: match
@@ -129,5 +131,6 @@
   match:
     all:
       - {field: category, eq: authentication}
+      - {field: outcome, eq: success}
       - {field: attributes.src_hosting, eq: true}
   entities: [principal, src_ip]

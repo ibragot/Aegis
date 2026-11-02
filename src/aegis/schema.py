@@ -152,6 +152,7 @@ class Incident(BaseModel):
     alert_ids: list[str] = Field(default_factory=list)
     entities: list[EntityRef] = Field(default_factory=list)
     tactics: list[str] = Field(default_factory=list)  # in the order they were first observed
+    correlation_keys: list[str] = Field(default_factory=list)  # strong entity ids used for merging
 
 
 class Evidence(BaseModel):

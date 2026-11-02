@@ -160,7 +160,7 @@ class RulesEngine:
             description=rule.description,
             entities=entities_from_event(evt, rule.entities),
             event_ids=event_ids[-50:],
-            evidence={"action": evt.action, "src_ip": evt.src_ip, "principal": evt.principal,
+            evidence={"action": evt.action, "category": evt.category, "outcome": evt.outcome, "src_ip": evt.src_ip, "principal": evt.principal,
                       "target": evt.target_resource, **evidence},
         )
 
