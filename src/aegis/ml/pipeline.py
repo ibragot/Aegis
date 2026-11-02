@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from aegis.collectors import normalize
-from aegis.config import REPO_ROOT, get_settings
+from aegis.config import get_settings
 from aegis.ml.features import FEATURE_NAMES, FeatureExtractor
 from aegis.ml.models import (
     AutoencoderDetector,
@@ -122,7 +122,7 @@ def train_and_evaluate(
 ) -> dict:
     settings = get_settings()
     model_dir = model_dir or settings.model_dir
-    report_dir = report_dir or (REPO_ROOT / "ml" / "reports")
+    report_dir = report_dir or settings.report_dir
     t0 = time.time()
     d0 = datetime(2026, 9, 7, tzinfo=UTC)
 

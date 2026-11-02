@@ -1,0 +1,22 @@
+# Exposes the dashboard through an AWS Application Load Balancer (requires the AWS Load Balancer
+# Controller). Restrict who can reach it: an internal ALB, an IP allow-list, or better, put it behind
+# an identity-aware proxy / Amazon Cognito authentication (zero trust - the SOC console is sensitive).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aegis
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/...
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: api, port: {number: 80}}

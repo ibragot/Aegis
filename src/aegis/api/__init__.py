@@ -181,8 +181,8 @@ def create_app(pipeline=None, settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/ml/report", dependencies=[api])
     def ml_report():
-        for p in (REPO_ROOT / "ml" / "reports" / "metrics.json", settings.model_dir / "reports" / "metrics.json",
-                  Path("/app/ml/reports/metrics.json")):
+        for p in (settings.report_dir / "metrics.json", REPO_ROOT / "ml" / "reports" / "metrics.json",
+                  settings.model_dir / "reports" / "metrics.json"):
             if p.exists():
                 return JSONResponse(json.loads(p.read_text()))
         raise HTTPException(404, "no ML report yet - run `aegis train`")

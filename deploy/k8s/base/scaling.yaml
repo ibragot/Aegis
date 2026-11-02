@@ -1,0 +1,38 @@
+# Horizontal Pod Autoscalers for the stateless-ish analyzers. maxReplicas = 6 because each topic
+# has 6 partitions: a consumer group can never use more consumers than partitions (extra pods idle).
+# CPU is a rough proxy; the better signal is Kafka consumer lag - see overlays/eks/keda.yaml.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: auth-analyzer}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: auth-analyzer}
+  minReplicas: 2
+  maxReplicas: 6
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: cloud-analyzer}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: cloud-analyzer}
+  minReplicas: 1
+  maxReplicas: 6
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: network-analyzer}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: network-analyzer}
+  minReplicas: 1
+  maxReplicas: 6
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: ml-inference}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: ml-inference}
+  minReplicas: 1
+  maxReplicas: 6
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 60}}}]

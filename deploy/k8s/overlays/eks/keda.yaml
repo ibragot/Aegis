@@ -1,0 +1,36 @@
+# Event-driven autoscaling with KEDA (https://keda.sh): scale analyzers on Kafka *consumer lag*
+# instead of CPU. When an attack burst or a log backlog arrives, lag grows and KEDA adds pods
+# (up to the partition count); when the backlog drains it scales back down.
+# Requires KEDA installed in the cluster. A ScaledObject manages its own HPA, so the CPU HPA
+# from the base for the same Deployment is removed below.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: auth-analyzer}
+spec:
+  scaleTargetRef: {name: auth-analyzer}
+  minReplicaCount: 2
+  maxReplicaCount: 6
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: b-1.aegis.xxxxxx.c2.kafka.us-east-1.amazonaws.com:9094
+        consumerGroup: auth-analyzer
+        topic: events.auth
+        lagThreshold: "500"
+        tls: enable
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: ml-inference}
+spec:
+  scaleTargetRef: {name: ml-inference}
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: b-1.aegis.xxxxxx.c2.kafka.us-east-1.amazonaws.com:9094
+        consumerGroup: ml-inference
+        topic: events.cloud
+        lagThreshold: "1000"
+        tls: enable

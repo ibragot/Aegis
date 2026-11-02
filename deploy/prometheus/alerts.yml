@@ -1,0 +1,39 @@
+# Alerting rules about the *platform itself* (SRE for the SIEM): a security pipeline
+# that silently stops processing is itself a security incident.
+groups:
+  - name: aegis-platform
+    rules:
+      - alert: AegisConsumerLagHigh
+        expr: sum by (group) (aegis_consumer_lag) > 5000
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Consumer group {{ $labels.group }} is falling behind ({{ $value }} messages)"
+          description: "Scale the deployment (more replicas, up to the partition count) or investigate slow processing."
+
+      - alert: AegisNoEventsIngested
+        expr: sum(rate(aegis_events_processed_total{service="collector"}[5m])) == 0
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "No events ingested for 10 minutes - log sources or the collector are down (detection blind spot)"
+
+      - alert: AegisProcessingErrors
+        expr: sum by (service) (rate(aegis_processing_errors_total[5m])) > 0.1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.service }} is failing to process messages"
+
+      - alert: AegisCriticalIncidentOpen
+        expr: aegis_open_incidents{risk_level="CRITICAL"} > 0
+        labels: { severity: page }
+        annotations:
+          summary: "A CRITICAL security incident is open in Aegis"
+
+      - alert: AegisMLInferenceSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(aegis_ml_inference_seconds_bucket[5m]))) > 0.01
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p99 ML inference latency above 10ms per event"

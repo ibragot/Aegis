@@ -1,0 +1,171 @@
+# Full Aegis stack on one machine:
+#   docker compose up -d --build        # first run builds the image (~5 min) and trains the models
+#   open http://localhost:8000          # dashboard
+#   open http://localhost:3000          # Grafana (admin / aegis)
+#   open http://localhost:16686         # Jaeger (distributed traces)
+#
+# Infrastructure: Kafka (KRaft, no ZooKeeper), PostgreSQL, Redis, LocalStack (S3 API),
+# Prometheus, Grafana, OpenTelemetry Collector, Jaeger.
+# Aegis microservices: generator -> collector -> {auth x2, cloud, network}-analyzer + ml-inference
+#                      + indexer -> correlator -> investigator, and the api/dashboard.
+
+x-aegis: &aegis
+  image: aegis:local
+  build: .
+  restart: unless-stopped
+  environment: &aegis-env
+    AEGIS_BUS: kafka
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    KAFKA_PARTITIONS: "6"
+    DATABASE_URL: postgresql+psycopg://aegis:aegis@postgres:5432/aegis
+    REDIS_URL: redis://redis:6379/0
+    AEGIS_ARCHIVE_BUCKET: aegis-raw-archive
+    S3_ENDPOINT_URL: http://localstack:4566
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    AWS_DEFAULT_REGION: us-east-1
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    AEGIS_GENERATOR_EPS: "3"
+    AEGIS_ATTACK_INTERVAL_S: "240"
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    AEGIS_LOG_LEVEL: INFO
+  depends_on:
+    kafka: { condition: service_healthy }
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+services:
+  # ------------------------------------------------------------------ infrastructure
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_LOG_RETENTION_HOURS: 24
+    ports: ["9094:9094"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  localstack:  # emulates the AWS S3 API locally (the data-lake archive)
+    image: localstack/localstack:3.8.1
+    environment:
+      SERVICES: s3
+    ports: ["4566:4566"]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes: ["./deploy/otel/otel-collector.yaml:/etc/otel/config.yaml:ro"]
+    depends_on: [jaeger]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686"]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: aegis
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  # ------------------------------------------------------------------ Aegis microservices
+  generator:
+    <<: *aegis
+    command: ["aegis", "run", "generator"]
+
+  collector:
+    <<: *aegis
+    command: ["aegis", "run", "collector"]
+    depends_on:
+      kafka: { condition: service_healthy }
+      localstack: { condition: service_started }
+
+  auth-analyzer:
+    <<: *aegis
+    command: ["aegis", "run", "auth-analyzer"]
+    deploy:
+      replicas: 2   # auth-analyzer-1 and auth-analyzer-2 share the partitions of events.auth
+
+  cloud-analyzer:
+    <<: *aegis
+    command: ["aegis", "run", "cloud-analyzer"]
+
+  network-analyzer:
+    <<: *aegis
+    command: ["aegis", "run", "network-analyzer"]
+
+  ml-inference:
+    <<: *aegis
+    command: ["aegis", "run", "ml-inference"]
+
+  indexer:
+    <<: *aegis
+    command: ["aegis", "run", "indexer"]
+
+  correlator:
+    <<: *aegis
+    command: ["aegis", "run", "correlator"]
+
+  investigator:
+    <<: *aegis
+    command: ["aegis", "run", "investigator"]
+
+  api:
+    <<: *aegis
+    command: ["aegis", "api"]
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      retries: 10
+
+volumes:
+  pgdata:

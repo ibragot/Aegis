@@ -1,0 +1,383 @@
+# Generated layout: one Deployment per Aegis microservice (same image, different args).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: generator
+  labels: {app.kubernetes.io/name: generator, app.kubernetes.io/component: worker}
+spec:
+  # Synthetic lab traffic. Remove this Deployment when ingesting real logs.
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: generator}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: generator, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: generator
+          image: aegis
+          args: ["aegis", "run", "generator"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: generator}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  labels: {app.kubernetes.io/name: collector, app.kubernetes.io/component: worker}
+spec:
+  replicas: 2
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: collector}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: collector, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: collector
+          image: aegis
+          args: ["aegis", "run", "collector"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: collector}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-analyzer
+  labels: {app.kubernetes.io/name: auth-analyzer, app.kubernetes.io/component: worker}
+spec:
+  # auth-analyzer-1 / auth-analyzer-2: the consumer group splits events.auth partitions between pods.
+  replicas: 2
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: auth-analyzer}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: auth-analyzer, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: auth-analyzer
+          image: aegis
+          args: ["aegis", "run", "auth-analyzer"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: auth-analyzer}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-analyzer
+  labels: {app.kubernetes.io/name: cloud-analyzer, app.kubernetes.io/component: worker}
+spec:
+  replicas: 1
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: cloud-analyzer}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: cloud-analyzer, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: cloud-analyzer
+          image: aegis
+          args: ["aegis", "run", "cloud-analyzer"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: cloud-analyzer}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-analyzer
+  labels: {app.kubernetes.io/name: network-analyzer, app.kubernetes.io/component: worker}
+spec:
+  replicas: 1
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: network-analyzer}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: network-analyzer, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: network-analyzer
+          image: aegis
+          args: ["aegis", "run", "network-analyzer"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: network-analyzer}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-inference
+  labels: {app.kubernetes.io/name: ml-inference, app.kubernetes.io/component: worker}
+spec:
+  replicas: 1
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: ml-inference}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ml-inference, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: ml-inference
+          image: aegis
+          args: ["aegis", "run", "ml-inference"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: ml-inference}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indexer
+  labels: {app.kubernetes.io/name: indexer, app.kubernetes.io/component: worker}
+spec:
+  replicas: 1
+  strategy: {type: RollingUpdate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: indexer}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: indexer, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: indexer
+          image: aegis
+          args: ["aegis", "run", "indexer"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: indexer}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: correlator
+  labels: {app.kubernetes.io/name: correlator, app.kubernetes.io/component: worker}
+spec:
+  # Exactly one correlator: it needs a global view of open incidents (Recreate = never two at once).
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: correlator}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: correlator, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: correlator
+          image: aegis
+          args: ["aegis", "run", "correlator"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: correlator}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investigator
+  labels: {app.kubernetes.io/name: investigator, app.kubernetes.io/component: worker}
+spec:
+  # One investigator: LLM calls are rate-limited and reports are debounced per incident.
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: investigator}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: investigator, app.kubernetes.io/component: worker}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9100"}
+    spec:
+      serviceAccountName: aegis
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: investigator
+          image: aegis
+          args: ["aegis", "run", "investigator"]
+          envFrom:
+            - configMapRef: {name: aegis-config}
+            - secretRef: {name: aegis-secrets, optional: true}
+          env:
+            - {name: AEGIS_SERVICE_NAME, value: investigator}
+          ports: [{name: metrics, containerPort: 9100}]
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
