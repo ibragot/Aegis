@@ -179,14 +179,14 @@ function renderGraph(d) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j];
         let dx = a.x - b.x, dy = a.y - b.y; const dist2 = Math.max(dx * dx + dy * dy, 25);
-        const f = 2200 / dist2; dx *= f / Math.sqrt(dist2); dy *= f / Math.sqrt(dist2);
+        const f = 4200 / dist2; dx *= f / Math.sqrt(dist2); dy *= f / Math.sqrt(dist2);
         a.vx += dx; a.vy += dy; b.vx -= dx; b.vy -= dy;
       }
     }
     for (const l of links) {
       const a = nodes[l.s], b = nodes[l.t];
       const dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const f = (dist - 90) * 0.02;
+      const f = (dist - 120) * 0.02;
       a.vx += (dx / dist) * f; a.vy += (dy / dist) * f; b.vx -= (dx / dist) * f; b.vy -= (dy / dist) * f;
     }
     for (const n of nodes) {
