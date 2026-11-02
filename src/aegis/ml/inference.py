@@ -87,7 +87,9 @@ class MLEngine:
                         f"{evt.action} by {evt.entity_key} deviates from its learned baseline "
                         f"(score {s:.2f}x threshold, model={self.model})."
                     ),
-                    entities=entities_from_event(evt, ["principal", "src_ip", "target_resource"]),
+                    # for network flows the "target" is just the destination IP - keep it an ip entity
+                    entities=entities_from_event(
+                        evt, ["principal", "src_ip", "dst_ip" if evt.category == "network" else "target_resource"]),
                     event_ids=[evt.event_id],
                     evidence={
                         "action": evt.action,
