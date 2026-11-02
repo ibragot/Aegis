@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aegis Security Console</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>AEGIS</span><small>cloud detection &amp; investigation</small>
+    </div>
+    <nav class="tabs" id="mainTabs">
+      <button data-view="incidents" class="active">Incidents</button>
+      <button data-view="alerts">Alerts</button>
+      <button data-view="events">Live events</button>
+      <button data-view="engineering">Detection engineering</button>
+    </nav>
+    <div class="status" id="status">connecting...</div>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <main>
+    <!-- Incidents view -->
+    <div class="view" id="view-incidents">
+      <aside class="queue">
+        <div class="queue-head">
+          <h2>Incident queue</h2>
+          <select id="minLevel" aria-label="Minimum risk level">
+            <option value="LOW">All levels</option>
+            <option value="MEDIUM" selected>Medium+</option>
+            <option value="HIGH">High+</option>
+            <option value="CRITICAL">Critical</option>
+          </select>
+        </div>
+        <div id="incidentList" class="incident-list"></div>
+        <div class="simulate">
+          <h3>Simulate an attack (synthetic)</h3>
+          <div id="scenarioButtons" class="scenario-buttons"></div>
+          <p class="muted small" id="simResult"></p>
+        </div>
+      </aside>
+
+      <section class="detail" id="detail">
+        <div class="empty">Select an incident - or simulate an attack on the left.</div>
+      </section>
+    </div>
+
+    <div class="view hidden" id="view-alerts"><div class="panel"><h2>Recent alerts</h2><div id="alertsTable"></div></div></div>
+    <div class="view hidden" id="view-events"><div class="panel"><h2>Normalized event stream</h2><div id="eventsTable"></div></div></div>
+    <div class="view hidden" id="view-engineering">
+      <div class="panel"><h2>ML model evaluation (held-out test set)</h2><div id="mlReport"></div></div>
+      <div class="panel"><h2>Detection rules (detection-as-code)</h2><div id="rulesTable"></div></div>
+    </div>
+  </main>
+
+  <div id="tooltip" class="tooltip hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
